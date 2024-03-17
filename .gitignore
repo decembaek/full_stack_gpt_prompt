@@ -2,6 +2,10 @@
 /venv
 *.env
 .env
+env/
+files/
+.cache
+.cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
