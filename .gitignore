@@ -6,6 +6,9 @@ env/
 files/
 .cache
 .cache/
+.streamlit
+.streamlit/
+streamlit/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
