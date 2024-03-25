@@ -1,7 +1,7 @@
 import streamlit as st
 
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.prompts import ChatPromptTemplate
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
@@ -9,11 +9,10 @@ from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain.vectorstores import FAISS
 from langchain.storage import LocalFileStore
 from langchain.callbacks.base import BaseCallbackHandler
-from langchain.memory import ConversationSummaryBufferMemory
 
 
 st.set_page_config(
-    page_title="DocumentGPT",
+    page_title="PrivateGPT",
     page_icon="📄",
 )
 
@@ -21,11 +20,11 @@ st.set_page_config(
 @st.cache_data(show_spinner="Embedding file...")
 def embed_file(file):
     file_content = file.read()
-    file_path = f"./.cache/files/{file.name}"
+    file_path = f"./.cache/private_files/{file.name}"
     with open(file_path, "wb") as f:
         f.write(file_content)
 
-    cache_dir = LocalFileStore(f"./.cache/embeddings/{file.name}")
+    cache_dir = LocalFileStore(f"./.cache/private_embeddings/{file.name}")
 
     splitter = CharacterTextSplitter.from_tiktoken_encoder(
         separator="\n",
@@ -57,7 +56,6 @@ def send_message(message, role, save=True):
         st.markdown(message)
     if save:
         save_message(message, role)
-        # memory.update_memory(st.session_state["messages"])
 
 
 def paint_history():
@@ -94,10 +92,6 @@ class ChatCallBackHandler(BaseCallbackHandler):
         self.message_box.markdown(self.message)
 
 
-def load_memory(_):
-    return memory.load_memory_variables({})["chat_history"]
-
-
 llm = ChatOpenAI(
     temperature=0.1,
     streaming=True,
@@ -105,14 +99,6 @@ llm = ChatOpenAI(
         ChatCallBackHandler(),
     ],
 )
-
-memory = ConversationSummaryBufferMemory(
-    llm=llm,
-    max_token_limit=300,
-    memory_key="chat_history",
-)
-
-# conversation =
 
 prompt = ChatPromptTemplate.from_messages(
     [
@@ -127,7 +113,6 @@ prompt = ChatPromptTemplate.from_messages(
             Context: {context}
             """,
         ),
-        MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{question}"),
     ]
 )
@@ -160,8 +145,7 @@ if file:
     if message:
         send_message(message, "human")
         chain = (
-            RunnablePassthrough.assign(chat_history=load_memory)
-            | {
+            {
                 "context": retriever | RunnableLambda(format_docs),
                 "question": RunnablePassthrough(),
             }
@@ -170,11 +154,12 @@ if file:
         )
         # ai가 쓰는거 처럼 보이게 하기
         with st.chat_message("ai"):
-            content = chain.invoke(message)
-        memory.save_context(
-            {"input": message},
-            {"output": content.content},
-        )
+            chain.invoke(message)
+        # send_message(response.content, "ai")
+        # docs = retriever.invoke(message)
+        # docs = "\n\n".join(document.page_content for document in docs)
+        # prompt = template.format_messages(context=docs, question=message)
+        # llm.predict_messages(prompt)
 
 else:
     st.session_state["messages"] = []
